@@ -1,0 +1,6 @@
+lightning
+torch
+torchvision
+scikit-learn
+pandas
+transformers

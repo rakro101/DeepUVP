@@ -38,7 +38,7 @@ def lightning_training(model_dir: str, hyperparameters: dict) -> object:
     )
 
 
-    wandb_logger = WandbLogger(log_model="all", project="cifar")
+    wandb_logger = WandbLogger(log_model="all", project="UVP001")
 
     print(wandb_logger.experiment.name)
     print(wandb_logger.experiment.path)

@@ -2,18 +2,12 @@
 
 import logging
 import os
-from typing import Any, Union
 
-import joblib
 import lightning as pl
-import numpy as np
 from lightning import seed_everything
 from torch.utils.data import DataLoader, random_split
-from torchvision import transforms
-import torchvision
-import torch
+from torchvision import datasets, transforms
 
-import torchvision
 import ssl
 import torch
 
@@ -38,45 +32,11 @@ class Encoder:
         Function to load the label encoder from s3
         Returns:
         """
-        classes = ('plane', 'car', 'bird', 'cat',
-                   'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+        classes = ['Acartiidae', 'Actiniaria', 'Actinopterygii', 'Aglaura', 'Amphipoda', 'Annelida', 'Atlanta', 'Bassia', 'Bivalvia', 'Calanidae', 'Calanoida', 'Calocalanus pavo', 'Candaciidae', 'Cavolinia inflexa', 'Centropagidae', 'Chaetognatha', 'Copilia', 'Corycaeidae', 'Coscinodiscus', 'Creseidae', 'Creseidae acicula', 'Ctenophora', 'Cumacea', 'Cymbulia peroni', 'Doliolida', 'Eucalanidae', 'Euchaetidae', 'Eumalacostraca', 'Evadne', 'Foraminifera', 'Fritillariidae', 'Gymnosomata', 'Haloptilus', 'Harosa', 'Harpacticoida', 'Heterorhabdidae', 'Hydrozoa', 'Hyperiidea', 'Insecta', 'Isopoda', 'Limacinidae', 'Liriope', 'Metridinidae', 'Mysida', 'Neoceratium', 'Noctiluca', 'Obelia', 'Oikopleuridae', 'Oithonidae', 'Oncaeidae', 'Ostracoda', 'Penilia', 'Phaeodaria', 'Physonectae', 'Podon', 'Pontellidae', 'Pyrosomatida', 'Rhincalanidae', 'Rhopalonema velatum', 'Salpida', 'Sapphirinidae', 'Solmundella bitentaculata', 'Temoridae', 'Tomopteridae', 'actinula', 'artefact', 'badfocus', 'bract_Abylopsis tetragona', 'bract_Diphyidae', 'bubble', 'calyptopsis', 'cirrus', 'cyphonaute', 'cypris', 'detritus', 'egg_Actinopterygii', 'egg_Mollusca', 'endostyle', 'ephyra', 'eudoxie_Abylopsis tetragona', 'eudoxie_Diphyidae', 'fiber', 'gonophore_Abylopsis tetragona', 'gonophore_Diphyidae', 'head_Chaetognatha', 'juvenile_Salpida', 'larvae_Annelida', 'larvae_Echinodermata', 'larvae_Luciferidae', 'larvae_Mysida', 'larvae_Porcellanidae', 'larvae_Stomatopoda', 'megalopa', 'metanauplii_Crustacea', 'nauplii_Cirripedia', 'nauplii_Crustacea', 'nectophore_Abylopsis tetragona', 'nectophore_Diphyidae', 'nectophore_Hippopodiidae', 'nectophore_Physonectae', 'nucleus', 'other_egg', 'other_living', 'part_Annelida', 'part_Cnidaria', 'part_Crustacea', 'part_Mollusca', 'part_Siphonophorae', 'pluteus_Echinoidea', 'pluteus_Ophiuroidea', 'protozoea_Eumalacostraca', 'protozoea_Penaeidae', 'protozoea_Sergestidae', 'seaweed', 'siphonula', 'tail_Appendicularia', 'tail_Chaetognatha', 'trunk_Appendicularia', 'zoea_Brachyura', 'zoea_Galatheidae']
 
         le = LabelEncoder()
         le.fit(classes)
         return le
-
-
-class CifarDataset(Dataset):
-    """Face Landmarks dataset."""
-
-    def __init__(self, dataset = None,  transform=None):
-        """
-        Arguments:
-            csv_file (string): Path to the csv file with annotations.
-            root_dir (string): Directory with all the images.
-            transform (callable, optional): Optional transform to be applied
-                on a sample.
-        """
-        self.cifar = dataset
-        self.transform = transform
-
-    def __len__(self):
-        return len(self.cifar)
-
-    def __getitem__(self, idx):
-        if torch.is_tensor(idx):
-            idx = idx.tolist()
-
-        img = self.cifar.data[idx]
-        label = self.cifar.targets[idx]
-
-        if self.transform:
-            img = self.transform(img)
-
-        sample = {'IMG': img, 'NID': idx, "GT": label}
-
-        return sample
-
 
 
 class ImgDataModule(pl.LightningDataModule):
@@ -90,7 +50,7 @@ class ImgDataModule(pl.LightningDataModule):
             hyperparameters:  Hyperparameters
         """
         super().__init__()
-        self.data_dir ="./data"
+        self.data_dir ="ZooScanNet/imgs"
         self.hyperparameters = hyperparameters
         self.batch_size = hyperparameters["batch_size"]
         self.hyperparameters = hyperparameters
@@ -98,8 +58,9 @@ class ImgDataModule(pl.LightningDataModule):
         # Augmentation policy for training set
         self.augmentation = transforms.Compose(
             [
-                torchvision.transforms.ToPILImage(),
-                #transforms.Resize(size=224),
+                #torchvision.transforms.ToPILImage(),
+                transforms.Grayscale(num_output_channels=3),  # Convert 1 channel (BW) to 3 channels (RGB)
+                transforms.Resize((224, 224)),
                 transforms.RandomResizedCrop(size=300, scale=(0.8, 1.0)),
                 transforms.RandomRotation(degrees=15),
                 transforms.RandomHorizontalFlip(),
@@ -114,29 +75,27 @@ class ImgDataModule(pl.LightningDataModule):
         # Preprocessing steps applied to validation and test set.
         self.transform = transforms.Compose(
             [
-                torchvision.transforms.ToPILImage(),
-                transforms.Resize(size=224),
+                #torchvision.transforms.ToPILImage(),
+                transforms.Grayscale(num_output_channels=3),  # Convert 1 channel (BW) to 3 channels (RGB)
+                transforms.Resize((224, 224)),
                 transforms.ToTensor(),
                 transforms.Normalize([0.5], [0.5], [0.5]),
             ]
         )
 
     def prepare_data(self):
-        torchvision.datasets.CIFAR10(self.data_dir, train=True, download=True)
-        torchvision.datasets.CIFAR10(self.data_dir, train=False, download=True)
+        self.dataset = datasets.ImageFolder(root=self.data_dir, transform=self.transform)
+        self.zoo_train, self.zoo_val, self.zoo_test = random_split(self.dataset, [0.7, 0.15, 0.15])
 
     def setup(self, stage=None):
         # Assign train/val datasets for use in dataloaders
         if stage in ['fit', "validate"] or stage is None:
-            cifar_full = CifarDataset(torchvision.datasets.CIFAR10(self.data_dir, train=True),transform=self.transform)
-            self.cifar_train, self.cifar_val = random_split(cifar_full, [45000, 5000])
-            self.dataset_train = self.cifar_train
-            self.dataset_val = self.cifar_val
+            self.dataset_train = self.zoo_train
+            self.dataset_val = self.zoo_val
 
         # Assign test dataset for use in dataloader(s)
         if stage == 'test' or stage is None:
-            self.cifar_test = torchvision.datasets.CIFAR10(self.data_dir, train=False)
-            self.dataset_test = CifarDataset(self.cifar_test,transform=self.transform)
+            self.dataset_test = self.zoo_test
 
 
     def train_dataloader(self) -> DataLoader:

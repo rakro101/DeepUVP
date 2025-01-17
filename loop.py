@@ -37,22 +37,18 @@ class SklearnMetricsCallback(pl.Callback):
     def on_test_epoch_end(self, trainer, pl_module):
         output_list = []
         ground_truths_list = []
-        numerical_ids_list = []
         for batch_item in pl_module.pred_list:
             output_list.append(batch_item["outputs"])
             ground_truths_list.append(batch_item["ground_truth"])
-            numerical_ids_list.append(batch_item["numerical_id"])
         output_tensor = torch.concat(output_list, dim=0)
         ground_truths_tensor = torch.concat(ground_truths_list, dim=0)
-        numerical_ids_tensor = torch.concat(numerical_ids_list, dim=0)
-        self._sklearn_metrics(output_tensor, ground_truths_tensor, "test", numerical_ids_tensor)
+        self._sklearn_metrics(output_tensor, ground_truths_tensor, "test")
 
     def _sklearn_metrics(
-        self, output: torch.Tensor, ground_truths: torch.Tensor, mode: str, numerical_ids: torch.Tensor
+        self, output: torch.Tensor, ground_truths: torch.Tensor, mode: str
     ):
         logger.info(("output shape", output.shape))
         logger.info(("ground_truths shape", ground_truths.shape))
-        logger.info(("numerical_ids shape", numerical_ids.shape))
         model_dir = self.hyperparameters["model_dir"]
 
         softmax = nn.Softmax(dim=1)
@@ -60,13 +56,12 @@ class SklearnMetricsCallback(pl.Callback):
         confis = softmax(output).detach().cpu().numpy()
         y_pred = self.label_encoder.inverse_transform(preds.detach().cpu().numpy())
         y_true = self.label_encoder.inverse_transform(ground_truths.detach().cpu().numpy())
-        numerical_id_ = numerical_ids.detach().cpu().numpy()
 
         report = classification_report(y_true, y_pred, output_dict=True)
         report_confusion_matrix = confusion_matrix(y_true, y_pred, labels=list(self.label_encoder.classes_))
 
         self.save_reports(model_dir, mode, report_confusion_matrix, report)
-        self.save_test_evaluations(model_dir, mode, y_pred, y_true, confis, numerical_id_)
+        self.save_test_evaluations(model_dir, mode, y_pred, y_true, confis)
 
     def save_reports(self, model_dir, mode, report_confusion_matrix, report):
         """Save classification report and confusion matrix to csv file.
@@ -85,23 +80,21 @@ class SklearnMetricsCallback(pl.Callback):
         df_cr.to_csv(f"{model_dir}/{mode}_classification_report.csv", sep=";")
         logger.info("Confusion Matrix and Classication report are saved.")
 
-    def save_test_evaluations(self, model_dir, mode, y_pred, y_true, confis, numerical_id_):
+    def save_test_evaluations(self, model_dir, mode, y_pred, y_true, confis):
         """
-        Save a pandas dataframe with prediction and ground truth and identifier (numerical id) of the test dataset
+        Save a pandas dataframe with prediction and ground truth of the test dataset
         Args:
             model_dir:
             mode:
             y_pred:
             y_true:
             confis:
-            numerical_id_:
         Returns:
         """
         df_test = pd.DataFrame()
         df_test["pred"] = y_pred
         df_test["confidence"] = confis.max(axis=1)
         df_test["label"] = y_true
-        df_test["numerical_id"] = numerical_id_
         df_test.to_csv(f"{model_dir}/{mode}_labels_predictions.csv", sep=";")
         logger.info("The label predictions are saved.")
 
@@ -199,9 +192,7 @@ class LitModel(pl.LightningModule):
             dict with loss, outputs and ground_truth
 
         """
-        ground_truth = batch["GT"]
-        numerical_id = batch["NID"]
-        img = batch["IMG"]
+        img , ground_truth = batch
         out = self.forward(img)
         if mode == "train":
             loss = self.criterion(out, ground_truth)
@@ -217,9 +208,9 @@ class LitModel(pl.LightningModule):
             output = self.test_metrics(out, ground_truth)
             self.test_metrics.update(out, ground_truth)
             # reset predict list
-            self.pred_list = []
+            # self.pred_list = []
 
-        return {"outputs": out, "loss": loss, "ground_truth": ground_truth, "numerical_id": numerical_id}
+        return {"outputs": out, "loss": loss, "ground_truth": ground_truth}
 
     def _epoch_end(self, mode: str):
         """

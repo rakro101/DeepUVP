@@ -1,4 +1,4 @@
-"""Architecure Bert & Resnet lightning."""
+"""Architecure Resnet lightning."""
 
 import logging
 

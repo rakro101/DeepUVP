@@ -18,8 +18,8 @@ HYPERPARAMETERS = {
     "precision": "16-mixed",
     "out_uri": OUT_URI,
     "batch_size": 1536,
-    "max_epochs": 10,
-    "model_dir": "./artefacts",
+    "max_epochs": 5,
+    "model_dir": "./output", # if using wandb output will be stored unter wandb/id/files
     "learning_rate": 1e-3,
     "weight_decay": 5e-4,
     "momentum": 0.9,
@@ -35,5 +35,4 @@ HYPERPARAMETERS = {
     "continue": 0,
     "endpoint_mode": False,
     "selected_model": "resnet",
-    "input_dir": "lightning_data/",
 }

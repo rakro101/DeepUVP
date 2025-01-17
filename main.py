@@ -61,7 +61,7 @@ def lightning_training(model_dir: str, hyperparameters: dict) -> object:
         limit_train_batches=hyperparameters["limit_batches"],
         limit_test_batches=hyperparameters["limit_batches"],
         limit_val_batches=hyperparameters["limit_batches"],
-        log_every_n_steps = 2,
+        log_every_n_steps = 1,
         # fast_dev_run=True,
     )
     trainer.fit(model, data_module)

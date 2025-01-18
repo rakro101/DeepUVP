@@ -9,7 +9,7 @@ OUT_URI = "output/"
 
 HYPERPARAMETERS = {
     "freeze_backbones": "freeze", # "freeze"
-    "num_freeze_layers_resnet": 100,
+    "num_freeze_layers_resnet": 62-3,
     "devices": -1,
     "profiler": "advanced",
     "test_mode": "on",
@@ -18,10 +18,12 @@ HYPERPARAMETERS = {
     "precision": "16-mixed",
     "out_uri": OUT_URI,
     "batch_size": 1536,
-    "max_epochs": 5,
+    "max_epochs": 1,
     "model_dir": "./output/", # if using wandb output will be stored unter wandb/id/files
     "learning_rate": 1e-3,
     "weight_decay": 5e-4,
+    "gamma": 0.01,
+    "step_size": 100,
     "momentum": 0.9,
     "resnet18_name": "resnet18.pth",
     "load_model": True,

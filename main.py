@@ -56,7 +56,7 @@ def lightning_training(model_dir: str, hyperparameters: dict) -> object:
         accelerator="gpu",
         devices=hyperparameters["devices"],
         default_root_dir=model_dir,
-        strategy=DDPStrategy(find_unused_parameters=True) if torch.cuda.device_count() > 1 else "auto",
+        #strategy=DDPStrategy(find_unused_parameters=True) if torch.cuda.device_count() > 1 else "auto",
         precision=hyperparameters["precision"],
         limit_train_batches=hyperparameters["limit_batches"],
         limit_test_batches=hyperparameters["limit_batches"],

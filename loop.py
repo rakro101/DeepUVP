@@ -202,10 +202,12 @@ class LitModel(pl.LightningModule):
         elif mode == "val":
             loss = self.criterion(out, ground_truth)
             output = self.val_metrics(out, ground_truth)
+            self.log_dict(output)
             self.val_metrics.update(out, ground_truth)
         elif mode == "test":
             loss = self.criterion(out, ground_truth)
             output = self.test_metrics(out, ground_truth)
+            self.log_dict(output)
             self.test_metrics.update(out, ground_truth)
             # reset predict list
             # self.pred_list = []
@@ -271,7 +273,7 @@ class LitModel(pl.LightningModule):
             optimizer
         """
         optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate, weight_decay=self.hyperparameters["weight_decay"])
-        scheduler = StepLR(optimizer, step_size=10, gamma=0.1)
+        scheduler = StepLR(optimizer, step_size=self.hyperparameters["step_size"], gamma=self.hyperparameters["gamma"])
         return [optimizer], [{"scheduler": scheduler, "interval": "epoch"}]
 
     def configure_callbacks(self) -> Union[Sequence[pl.pytorch.Callback], pl.pytorch.Callback]:

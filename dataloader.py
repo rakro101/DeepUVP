@@ -69,7 +69,7 @@ class ImgDataModule(pl.LightningDataModule):
                 #transforms.RandomAutocontrast(),
                 transforms.CenterCrop(size=224),
                 transforms.ToTensor(),
-                transforms.Normalize([0.5], [0.5], [0.5]),
+                transforms.Normalize([0.5], [0.5], [0.5]),#calc for this train dataset
             ]
         )
         # Preprocessing steps applied to validation and test set.

@@ -22,6 +22,57 @@ logger = logging.getLogger()
 
 seed = seed_everything(21, workers=True)
 
+import torch
+from torch.utils.data import DataLoader
+
+
+# Wrapper class to apply transforms
+class TransformedDataset(Dataset):
+    def __init__(self, subset, transform=None):
+        self.subset = subset
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.subset)
+
+    def __getitem__(self, idx):
+        data, label = self.subset[idx]  # Access the data and label
+        if self.transform:
+            data = self.transform(data)
+        return data, label
+
+def calculate_mean_std(dataset, batch_size=1536):
+    """
+    Calculate the mean and standard deviation of a PyTorch dataset.
+
+    Args:
+        dataset (Dataset): PyTorch dataset (e.g., training dataset).
+        batch_size (int): Batch size for the DataLoader.
+
+    Returns:
+        tuple: Mean and standard deviation tensors.
+    """
+    # Use DataLoader to iterate through the dataset
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+
+    mean = 0.0
+    std = 0.0
+    n_samples = 0
+
+    for data, _ in loader:  # Assuming dataset returns (data, labels)
+        batch_samples = data.size(0)  # Number of samples in the batch
+        data = data.view(batch_samples, data.size(1), -1)  # Flatten H x W to single dimension
+        mean += data.mean(dim=(0, 2)).sum(0)  # Mean across H x W
+        std += data.std(dim=(0, 2)).sum(0)  # Std across H x W
+        n_samples += batch_samples
+        print("# of samples: ", n_samples)
+
+    mean /= n_samples
+    std /= n_samples
+
+    return mean, std
+
+
 
 class Encoder:
     def __init__(self):
@@ -65,8 +116,8 @@ class ImgDataModule(pl.LightningDataModule):
                 transforms.RandomRotation(degrees=15),
                 transforms.RandomHorizontalFlip(),
                 #transforms.RandomInvert(),
-                #transforms.RandomAdjustSharpness(0.05),
-                #transforms.RandomAutocontrast(),
+                transforms.RandomAdjustSharpness(0.05),
+                transforms.RandomAutocontrast(),
                 transforms.CenterCrop(size=224),
                 transforms.ToTensor(),
                 transforms.Normalize([0.5], [0.5], [0.5]),#calc for this train dataset
@@ -83,9 +134,17 @@ class ImgDataModule(pl.LightningDataModule):
             ]
         )
 
+
+
     def prepare_data(self):
-        self.dataset = datasets.ImageFolder(root=self.data_dir, transform=self.transform)
+        self.dataset = datasets.ImageFolder(root=self.data_dir, transform=None)
         self.zoo_train, self.zoo_val, self.zoo_test = random_split(self.dataset, [0.7, 0.15, 0.15])
+        self.zoo_train = TransformedDataset(self.zoo_train, transform=self.augmentation)
+        self.zoo_val = TransformedDataset(self.zoo_val, transform=self.transform)
+        self.zoo_test = TransformedDataset(self.zoo_test, transform=self.transform)
+
+
+
 
     def setup(self, stage=None):
         # Assign train/val datasets for use in dataloaders
@@ -138,3 +197,21 @@ class ImgDataModule(pl.LightningDataModule):
                                            batch_size=self.batch_size,
                                           num_workers=os.cpu_count(),
                                           shuffle=False,persistent_workers=True)
+
+if __name__ == "__main__":
+    data_dir = "ZooScanNet/imgs"
+    transform = transforms.Compose(
+        [
+            # torchvision.transforms.ToPILImage(),
+            transforms.Grayscale(num_output_channels=3),  # Convert 1 channel (BW) to 3 channels (RGB)
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+        ]
+    )
+    dataset = datasets.ImageFolder(root=data_dir, transform=transform)
+    zoo_train, zoo_val, zoo_test = random_split(dataset, [0.7, 0.15, 0.15])
+    mean, std = calculate_mean_std(zoo_train)
+
+    print("#####" * 10)
+    print(f"Mean: {mean}, Std: {std}")
+    print("#####" * 10)

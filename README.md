@@ -15,11 +15,21 @@ pip3 install -r requirements_.txt
 ```
 
 # Usage
-TBA
+Additional Networks/ Architectures can be implemented in model_arc.
+The dataloader is in dataloader.py.
+The training logic loop is in loop.py defined.
+The hyperparameter dicts in the config.py.
+
+Set up an Weight and Biases Account: https://wandb.ai/site/
 
 # Training - Data needed and computing power
+Here i use an open source Zooscan dataset https://www.seanoe.org/data/00446/55741/
+But we could use the dataloader from DeepLOKI aswell.
 
 Training: Run main.py
+Sweeps/Hyperparameter Tuning:  Run sweeps_main.py
+
+
 
 # Software used
 Training and Validation was performed on an Nvidia A$100$ (Nvidia Corp., Santa Clara, CA, USA) and on Apple M1 MAX with 32 GB (Apple, USA), depending on the computational power needed, for example self-supervised pre-training was performed on a Hyper performing cluster with Nvidia A$100$. <br>

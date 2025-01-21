@@ -14,11 +14,11 @@ HYPERPARAMETERS = {
     "profiler": "advanced",
     "test_mode": "on",
     "val_mode": "on",
-    "limit_batches": 1000000,
+    "limit_batches": 10,
     "precision": "16-mixed",
     "out_uri": OUT_URI,
     "batch_size": 1536,
-    "max_epochs": 1,
+    "max_epochs": 2,
     "model_dir": "./output/", # if using wandb output will be stored unter wandb/id/files
     "learning_rate": 1e-3,
     "weight_decay": 5e-4,

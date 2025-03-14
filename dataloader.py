@@ -77,13 +77,15 @@ def calculate_mean_std(dataset, batch_size=1536):
 class Encoder:
     def __init__(self):
         self.hyperparameters = HYPERPARAMETERS
+        self.data_dir = self.hyperparameters["data_dir"]
 
     def load_labelencoder(self):
         """
         Function to load the label encoder from s3
         Returns:
         """
-        classes = ['Acartiidae', 'Actiniaria', 'Actinopterygii', 'Aglaura', 'Amphipoda', 'Annelida', 'Atlanta', 'Bassia', 'Bivalvia', 'Calanidae', 'Calanoida', 'Calocalanus pavo', 'Candaciidae', 'Cavolinia inflexa', 'Centropagidae', 'Chaetognatha', 'Copilia', 'Corycaeidae', 'Coscinodiscus', 'Creseidae', 'Creseidae acicula', 'Ctenophora', 'Cumacea', 'Cymbulia peroni', 'Doliolida', 'Eucalanidae', 'Euchaetidae', 'Eumalacostraca', 'Evadne', 'Foraminifera', 'Fritillariidae', 'Gymnosomata', 'Haloptilus', 'Harosa', 'Harpacticoida', 'Heterorhabdidae', 'Hydrozoa', 'Hyperiidea', 'Insecta', 'Isopoda', 'Limacinidae', 'Liriope', 'Metridinidae', 'Mysida', 'Neoceratium', 'Noctiluca', 'Obelia', 'Oikopleuridae', 'Oithonidae', 'Oncaeidae', 'Ostracoda', 'Penilia', 'Phaeodaria', 'Physonectae', 'Podon', 'Pontellidae', 'Pyrosomatida', 'Rhincalanidae', 'Rhopalonema velatum', 'Salpida', 'Sapphirinidae', 'Solmundella bitentaculata', 'Temoridae', 'Tomopteridae', 'actinula', 'artefact', 'badfocus', 'bract_Abylopsis tetragona', 'bract_Diphyidae', 'bubble', 'calyptopsis', 'cirrus', 'cyphonaute', 'cypris', 'detritus', 'egg_Actinopterygii', 'egg_Mollusca', 'endostyle', 'ephyra', 'eudoxie_Abylopsis tetragona', 'eudoxie_Diphyidae', 'fiber', 'gonophore_Abylopsis tetragona', 'gonophore_Diphyidae', 'head_Chaetognatha', 'juvenile_Salpida', 'larvae_Annelida', 'larvae_Echinodermata', 'larvae_Luciferidae', 'larvae_Mysida', 'larvae_Porcellanidae', 'larvae_Stomatopoda', 'megalopa', 'metanauplii_Crustacea', 'nauplii_Cirripedia', 'nauplii_Crustacea', 'nectophore_Abylopsis tetragona', 'nectophore_Diphyidae', 'nectophore_Hippopodiidae', 'nectophore_Physonectae', 'nucleus', 'other_egg', 'other_living', 'part_Annelida', 'part_Cnidaria', 'part_Crustacea', 'part_Mollusca', 'part_Siphonophorae', 'pluteus_Echinoidea', 'pluteus_Ophiuroidea', 'protozoea_Eumalacostraca', 'protozoea_Penaeidae', 'protozoea_Sergestidae', 'seaweed', 'siphonula', 'tail_Appendicularia', 'tail_Chaetognatha', 'trunk_Appendicularia', 'zoea_Brachyura', 'zoea_Galatheidae']
+
+        classes = datasets.ImageFolder(root=self.data_dir + "/train", transform=None).classes
 
         le = LabelEncoder()
         le.fit(classes)
@@ -101,8 +103,8 @@ class ImgDataModule(pl.LightningDataModule):
             hyperparameters:  Hyperparameters
         """
         super().__init__()
-        self.data_dir ="ZooScanNet/imgs"
         self.hyperparameters = hyperparameters
+        self.data_dir =hyperparameters["data_dir"]
         self.batch_size = hyperparameters["batch_size"]
         self.hyperparameters = hyperparameters
         self.num_classes = hyperparameters["num_classes"]
@@ -112,15 +114,15 @@ class ImgDataModule(pl.LightningDataModule):
                 #torchvision.transforms.ToPILImage(),
                 transforms.Grayscale(num_output_channels=3),  # Convert 1 channel (BW) to 3 channels (RGB)
                 transforms.Resize((224, 224)),
-                transforms.RandomResizedCrop(size=300, scale=(0.8, 1.0)),
+                transforms.RandomResizedCrop(size=448, scale=(0.8, 1.0)),
                 transforms.RandomRotation(degrees=15),
                 transforms.RandomHorizontalFlip(),
                 #transforms.RandomInvert(),
-                transforms.RandomAdjustSharpness(0.05),
+                transforms.RandomAdjustSharpness(0.5),
                 transforms.RandomAutocontrast(),
                 transforms.CenterCrop(size=224),
                 transforms.ToTensor(),
-                transforms.Normalize([0.5], [0.5], [0.5]),#calc for this train dataset
+                #transforms.Normalize([4.852536949329078e-05], [9.840591519605368e-05]),#calc for this train dataset
             ]
         )
         # Preprocessing steps applied to validation and test set.
@@ -130,18 +132,17 @@ class ImgDataModule(pl.LightningDataModule):
                 transforms.Grayscale(num_output_channels=3),  # Convert 1 channel (BW) to 3 channels (RGB)
                 transforms.Resize((224, 224)),
                 transforms.ToTensor(),
-                transforms.Normalize([0.5], [0.5], [0.5]),
+                #transforms.Normalize([4.852536949329078e-05], [9.840591519605368e-05]),
             ]
         )
 
 
 
     def prepare_data(self):
-        self.dataset = datasets.ImageFolder(root=self.data_dir, transform=None)
-        self.zoo_train, self.zoo_val, self.zoo_test = random_split(self.dataset, [0.7, 0.15, 0.15])
-        self.zoo_train = TransformedDataset(self.zoo_train, transform=self.augmentation)
-        self.zoo_val = TransformedDataset(self.zoo_val, transform=self.transform)
-        self.zoo_test = TransformedDataset(self.zoo_test, transform=self.transform)
+        self.zoo_train = datasets.ImageFolder(root=self.data_dir + "/train", transform=self.augmentation)
+        self.zoo_test = datasets.ImageFolder(root=self.data_dir + "/test", transform=self.augmentation)
+        self.zoo_val = datasets.ImageFolder(root=self.data_dir + "/val", transform=self.augmentation)
+
 
 
 
@@ -199,7 +200,7 @@ class ImgDataModule(pl.LightningDataModule):
                                           shuffle=False,persistent_workers=True)
 
 if __name__ == "__main__":
-    data_dir = "ZooScanNet/imgs"
+    data_dir = "experiments/dataset002"
     transform = transforms.Compose(
         [
             # torchvision.transforms.ToPILImage(),
@@ -208,10 +209,16 @@ if __name__ == "__main__":
             transforms.ToTensor(),
         ]
     )
-    dataset = datasets.ImageFolder(root=data_dir, transform=transform)
-    zoo_train, zoo_val, zoo_test = random_split(dataset, [0.7, 0.15, 0.15])
-    mean, std = calculate_mean_std(zoo_train)
+    dataset_train = datasets.ImageFolder(root=data_dir+"/train", transform=transform)
+    dataset_test = datasets.ImageFolder(root=data_dir+"/test", transform=transform)
+    dataset_val = datasets.ImageFolder(root=data_dir+"/val", transform=transform)
 
-    print("#####" * 10)
+    print(dataset_train.classes)
+    print(dataset_test)
+    print(dataset_val)
+    #zoo_train, zoo_val, zoo_test = random_split(dataset, [0.7, 0.15, 0.15])
+    mean, std = calculate_mean_std(dataset_train)
+
+    #print("#####" * 10)
     print(f"Mean: {mean}, Std: {std}")
-    print("#####" * 10)
+    #print("#####" * 10)

@@ -13,7 +13,7 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from model_arc import ResNet18
 from sklearn.metrics import classification_report, confusion_matrix
 from torch import nn
-from torch.optim.lr_scheduler import StepLR
+from torch.optim.lr_scheduler import ExponentialLR
 from torchmetrics import MetricCollection
 from torchmetrics.classification import (
     MulticlassAccuracy,
@@ -22,27 +22,84 @@ from torchmetrics.classification import (
     MulticlassRecall,
 )
 from transformers import AdamW
+from PIL import Image
+from matplotlib import cm
+import numpy as np
 
 logger = logging.getLogger()
 
 seed = seed_everything(21, workers=True)
+import wandb
+from lightning.pytorch.callbacks import Callback
 
 
 class SklearnMetricsCallback(pl.Callback):
-    def __init__(self, label_encoder, hyperparameters):
+    def __init__(self, label_encoder, hyperparameters, logger):
         super().__init__()
         self.label_encoder = label_encoder
         self.hyperparameters = hyperparameters
+        self.logger = logger
 
     def on_test_epoch_end(self, trainer, pl_module):
         output_list = []
         ground_truths_list = []
+        image_list = []
         for batch_item in pl_module.pred_list:
             output_list.append(batch_item["outputs"])
             ground_truths_list.append(batch_item["ground_truth"])
+            image_list.append(batch_item["images"])
+
+
+        image_tensor = torch.concat(image_list, dim=0)
         output_tensor = torch.concat(output_list, dim=0)
         ground_truths_tensor = torch.concat(ground_truths_list, dim=0)
         self._sklearn_metrics(output_tensor, ground_truths_tensor, "test")
+        self._log_images(output_tensor , ground_truths_tensor, image_tensor)
+
+    def _log_images(self, output_tensor, ground_truths_tensor, image_tensor):
+
+        n = min(self.hyperparameters["number_of_test_img_save"], image_tensor.shape[0])  # Ensure we don't exceed available images
+        image_list = [image_tensor[i] for i in range(image_tensor.shape[0])][:n]
+
+        # Convert images to a format WandB accepts+
+        processed_images = []
+        for img in image_list[:n]:
+            if isinstance(img, torch.Tensor):
+                img = img.cpu().numpy()  # Convert torch tensor to NumPy
+                print(img.shape)
+                img = np.transpose(img, (1, 2, 0))  # Change shape from [C, H, W] to [H, W, C]
+                img = (img * 255).astype(np.uint8)  # Convert to 8-bit image (if needed)
+                img = Image.fromarray(img)
+            if isinstance(img, np.ndarray):
+                img = (img * 255).astype(np.uint8)
+                img = np.transpose(img, (1, 2, 0))
+                print(img.shape)
+                img = Image.fromarray(img)  # Convert NumPy array to PIL Image
+
+            processed_images.append(img)
+
+
+        softmax = nn.Softmax(dim=1)
+        preds = softmax(output_tensor).argmax(dim=1)
+        confis = softmax(output_tensor).max(dim=1).values.detach().cpu().numpy()
+        y_pred = self.label_encoder.inverse_transform(preds.detach().cpu().numpy())
+        y_true = self.label_encoder.inverse_transform(ground_truths_tensor.detach().cpu().numpy())
+
+        output_serialized = [y_pred[i] for i in range(y_pred.shape[0])][:n]
+        ground_truths_serialized = [y_true[i] for i in range(y_true.shape[0])][:n]
+        confis_serialized  = [confis[i] for i in range(confis.shape[0])][:n]
+        matches = [gt == out for gt, out in zip(ground_truths_serialized, output_serialized)]
+
+        # Option 1: Log images with captions
+        #captions = [f'Ground Truth: {gt} - Prediction: {pred} - Confidence: {con}' for gt, pred, con in zip(ground_truths_serialized, output_serialized, confis_serialized)]
+        #self.logger.log_image(key='sample_images', images=processed_images, caption=captions)
+
+        # Option 2: Log predictions as a WandB table
+        columns = ['image', 'ground truth', 'prediction', 'confidence', 'match']
+        data = [[wandb.Image(img), gt, pred, con, mat] for img, gt, pred, con, mat in
+                zip(processed_images, ground_truths_serialized, output_serialized, confis_serialized, matches)]
+
+        self.logger.log_table(key='UVP_1000_Match', columns=columns, data=data)
 
     def _sklearn_metrics(
         self, output: torch.Tensor, ground_truths: torch.Tensor, mode: str
@@ -60,8 +117,38 @@ class SklearnMetricsCallback(pl.Callback):
         report = classification_report(y_true, y_pred, output_dict=True)
         report_confusion_matrix = confusion_matrix(y_true, y_pred, labels=list(self.label_encoder.classes_))
 
+        wandb.log({"conf_mat": wandb.plot.confusion_matrix(
+                                                           y_true=ground_truths.detach().cpu().numpy(), preds=preds.detach().cpu().numpy(),
+                                                           class_names=list(self.label_encoder.classes_))})
+
         self.save_reports(model_dir, mode, report_confusion_matrix, report)
         self.save_test_evaluations(model_dir, mode, y_pred, y_true, confis)
+        # Save confusion matrix plot
+        try:
+            self._save_confusion_matrix_plot(report_confusion_matrix, model_dir, mode)
+        except Exception as e:
+            logger.exception(e)
+            logger.error("No Graphics generated")
+
+    def _save_confusion_matrix_plot(self, cm, model_dir, mode):
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        labels = list(self.label_encoder.classes_)
+        plt.figure(figsize=(12, 12))
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=labels, yticklabels=labels)
+        plt.xlabel('Predicted Label')
+        plt.ylabel('True Label')
+        plt.title(f'Confusion Matrix ({mode})')
+
+        # Ensure the directory exists
+        os.makedirs(model_dir, exist_ok=True)
+
+        # Save the figure
+        cm_path = os.path.join(model_dir, f'confusion_matrix_{mode}.png')
+        plt.tight_layout()
+        plt.savefig(cm_path)
+        plt.close()
+        logger.info(f"Confusion matrix saved to {cm_path}")
 
     def save_reports(self, model_dir, mode, report_confusion_matrix, report):
         """Save classification report and confusion matrix to csv file.
@@ -198,6 +285,7 @@ class LitModel(pl.LightningModule):
             loss = self.criterion(out, ground_truth)
             output = self.train_metrics(out, ground_truth)
             self.log_dict(output)
+            self.log("learning_rate", self.learning_rate)
             self.train_metrics.update(out, ground_truth)
         elif mode == "val":
             loss = self.criterion(out, ground_truth)
@@ -212,7 +300,7 @@ class LitModel(pl.LightningModule):
             # reset predict list
             # self.pred_list = []
 
-        return {"outputs": out, "loss": loss, "ground_truth": ground_truth}
+        return {"outputs": out, "loss": loss, "ground_truth": ground_truth, "images": img}
 
     def _epoch_end(self, mode: str):
         """
@@ -273,8 +361,8 @@ class LitModel(pl.LightningModule):
             optimizer
         """
         optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate, weight_decay=self.hyperparameters["weight_decay"])
-        scheduler = StepLR(optimizer, step_size=self.hyperparameters["step_size"], gamma=self.hyperparameters["gamma"])
-        return [optimizer], [{"scheduler": scheduler, "interval": "epoch"}]
+        scheduler = ExponentialLR(optimizer, gamma=self.hyperparameters["gamma"])
+        return [optimizer] , [{"scheduler": scheduler, "interval": "epoch"}]
 
     def configure_callbacks(self) -> Union[Sequence[pl.pytorch.Callback], pl.pytorch.Callback]:
         """Configure Early stopping or Model Checkpointing.
@@ -292,5 +380,5 @@ class LitModel(pl.LightningModule):
             filename=self.hyperparameters["model_filename"],
         )
 
-        sklearn = SklearnMetricsCallback(label_encoder=self.label_encoder, hyperparameters=self.hyperparameters)
+        sklearn = SklearnMetricsCallback(label_encoder=self.label_encoder, hyperparameters=self.hyperparameters, logger=self.logger)
         return [early_stop, checkpoint, sklearn]

@@ -32,4 +32,4 @@ jobs:
 
     - name: Ruff
       run: |
-        ruff format
+        ruff format *.py 

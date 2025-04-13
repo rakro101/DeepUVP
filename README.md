@@ -6,12 +6,10 @@
 # Installation Guide
 https://pytorch.org/get-started/locally/
 
-pip install torch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1
-
-```
+```sh
 brew install python@3.12
 pip3 install torch torchvision torchaudio
-pip3 install -r requirements_.txt
+pip3 install -r requirements.txt
 ```
 
 # Usage
@@ -28,8 +26,6 @@ But we could use the dataloader from DeepLOKI aswell.
 
 Training: Run main.py
 Sweeps/Hyperparameter Tuning:  Run sweeps_main.py
-
-
 
 # Software used
 Training and Validation was performed on an Nvidia A$100$ (Nvidia Corp., Santa Clara, CA, USA) and on Apple M1 MAX with 32 GB (Apple, USA), depending on the computational power needed, for example self-supervised pre-training was performed on a Hyper performing cluster with Nvidia A$100$. <br>
@@ -48,6 +44,12 @@ If you find a bug, create a GitHub issue, or even better, submit a pull request.
 # License , citation and acknowledgements
 Based on an earlier paper:
 Please advice the **LICENSE.md** file. For usage of third party libraries and repositories please advise the respective distributed terms. Please cite our paper, when using this code:
+
+# Dataset dataset_012
+Balanced datset, with copies / resample images of classes where we had only a few images.
+Annelida, Appendicularia, Artefact, Chaetognatha, Copepoda, Crsutacea, Preropoda, Radiolaria
+Train (800 per class) , Val(100 per class), Test Split(100 per class)
+(0.8,0.1,0.1)
 
 ```
 @software{kronbergapplicationsdeeploki,

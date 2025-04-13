@@ -15,6 +15,7 @@ ssl._create_default_https_context = ssl._create_stdlib_context
 from torch.utils.data import Dataset, DataLoader
 from config import HYPERPARAMETERS
 from sklearn.preprocessing import LabelEncoder
+
 pil_transform = transforms.Compose([transforms.PILToTensor()])
 
 logger = logging.getLogger()
@@ -25,12 +26,14 @@ seed = seed_everything(21, workers=True)
 import torch
 from torch.utils.data import DataLoader
 
+
 class ImageFolderWithPaths(datasets.ImageFolder):
     def __getitem__(self, index):
         img, label = super().__getitem__(index)
         path, _ = self.samples[index]  # Get image path
         filename = os.path.basename(path)  # Extract filename
         return img, label, filename  # Return filename along with data
+
 
 # Wrapper class to apply transforms
 class TransformedDataset(Dataset):
@@ -46,6 +49,7 @@ class TransformedDataset(Dataset):
         if self.transform:
             data = self.transform(data)
         return data, label
+
 
 def calculate_mean_std(dataset, batch_size=1536):
     """
@@ -67,7 +71,9 @@ def calculate_mean_std(dataset, batch_size=1536):
 
     for data, _ in loader:  # Assuming dataset returns (data, labels)
         batch_samples = data.size(0)  # Number of samples in the batch
-        data = data.view(batch_samples, data.size(1), -1)  # Flatten H x W to single dimension
+        data = data.view(
+            batch_samples, data.size(1), -1
+        )  # Flatten H x W to single dimension
 
         mean += data.mean(dim=(0, 2)) * batch_samples  # Weighted sum
         std += data.std(dim=(0, 2)) * batch_samples  # Weighted sum
@@ -81,7 +87,6 @@ def calculate_mean_std(dataset, batch_size=1536):
     return mean.numpy(), std.numpy()
 
 
-
 class Encoder:
     def __init__(self, HYPERPARAMETERS=HYPERPARAMETERS):
         self.hyperparameters = HYPERPARAMETERS
@@ -93,9 +98,11 @@ class Encoder:
         Returns:
         """
 
-        classes = datasets.ImageFolder(root=self.data_dir + "/train", transform=None).classes
-        #classes = classes.tolist()
-        #classes.append("XXX_Unknown_Label") # ToDo Think about
+        classes = datasets.ImageFolder(
+            root=self.data_dir + "/train", transform=None
+        ).classes
+        # classes = classes.tolist()
+        # classes.append("XXX_Unknown_Label") # ToDo Think about
 
         le = LabelEncoder()
         le.fit(classes)
@@ -122,58 +129,62 @@ class ImgDataModule(pl.LightningDataModule):
         # Augmentation policy for training set
         self.augmentation = transforms.Compose(
             [
-                #torchvision.transforms.ToPILImage(),
-                transforms.Grayscale(num_output_channels=3),  # Convert 1 channel (BW) to 3 channels (RGB)
+                # torchvision.transforms.ToPILImage(),
+                transforms.Grayscale(
+                    num_output_channels=3
+                ),  # Convert 1 channel (BW) to 3 channels (RGB)
                 transforms.Resize((224, 224)),
                 transforms.RandomResizedCrop(size=448, scale=(0.8, 1.0)),
                 transforms.RandomRotation(degrees=15),
                 transforms.RandomHorizontalFlip(),
-                #transforms.RandomInvert(),
+                # transforms.RandomInvert(),
                 transforms.RandomAdjustSharpness(0.5),
                 transforms.RandomAutocontrast(),
                 transforms.CenterCrop(size=224),
                 transforms.ToTensor(),
-                #transforms.Normalize([4.852536949329078e-05], [9.840591519605368e-05]),#calc for this train dataset
+                # transforms.Normalize([4.852536949329078e-05], [9.840591519605368e-05]),#calc for this train dataset
             ]
         )
         # Preprocessing steps applied to validation and test set.
         self.transform = transforms.Compose(
             [
-                #torchvision.transforms.ToPILImage(),
-                transforms.Grayscale(num_output_channels=3),  # Convert 1 channel (BW) to 3 channels (RGB)
+                # torchvision.transforms.ToPILImage(),
+                transforms.Grayscale(
+                    num_output_channels=3
+                ),  # Convert 1 channel (BW) to 3 channels (RGB)
                 transforms.Resize((448, 448)),
                 transforms.CenterCrop(size=224),
                 transforms.ToTensor(),
-                #transforms.Normalize([4.852536949329078e-05], [9.840591519605368e-05]),
+                # transforms.Normalize([4.852536949329078e-05], [9.840591519605368e-05]),
             ]
         )
 
-
-
     def prepare_data(self):
-        self.zoo_train = ImageFolderWithPaths(root=self.data_dir + "/train", transform=self.augmentation)
-        self.zoo_test = ImageFolderWithPaths(root=self.data_dir + "/test", transform=self.transform)
-        self.zoo_val = ImageFolderWithPaths(root=self.data_dir + "/val", transform=self.transform)
-        self.zoo_predict =ImageFolderWithPaths(root=self.predict_data_dir + "/predict", transform=self.transform)
-
-
-
-
+        self.zoo_train = ImageFolderWithPaths(
+            root=self.data_dir + "/train", transform=self.augmentation
+        )
+        self.zoo_test = ImageFolderWithPaths(
+            root=self.data_dir + "/test", transform=self.transform
+        )
+        self.zoo_val = ImageFolderWithPaths(
+            root=self.data_dir + "/val", transform=self.transform
+        )
+        self.zoo_predict = ImageFolderWithPaths(
+            root=self.predict_data_dir + "/predict", transform=self.transform
+        )
 
     def setup(self, stage=None):
         # Assign train/val datasets for use in dataloaders
-        if stage in ['fit', "validate"] or stage is None:
+        if stage in ["fit", "validate"] or stage is None:
             self.dataset_train = self.zoo_train
             self.dataset_val = self.zoo_val
 
-
         # Assign test dataset for use in dataloader(s)
-        if stage == 'test' or stage is None:
+        if stage == "test" or stage is None:
             self.dataset_test = self.zoo_test
 
-        if stage == 'predict' or stage is None:
+        if stage == "predict" or stage is None:
             self.dataset_predict = self.zoo_predict
-
 
     def train_dataloader(self) -> DataLoader:
         """
@@ -182,12 +193,14 @@ class ImgDataModule(pl.LightningDataModule):
             training dataloader
         """
 
-
         print(f"Length of the train dataset: {len(self.dataset_train)}")
-        return torch.utils.data.DataLoader(self.dataset_train,
-                                           batch_size=self.batch_size,
-                                          num_workers=os.cpu_count(),
-                                          shuffle=True, persistent_workers=True)
+        return torch.utils.data.DataLoader(
+            self.dataset_train,
+            batch_size=self.batch_size,
+            num_workers=os.cpu_count(),
+            shuffle=True,
+            persistent_workers=True,
+        )
 
     def val_dataloader(self) -> DataLoader:
         """
@@ -196,12 +209,14 @@ class ImgDataModule(pl.LightningDataModule):
             validation dataloader
         """
 
-
         print(f"Length of the val dataset: {len(self.dataset_val)}")
-        return torch.utils.data.DataLoader(self.dataset_val,
-                                           batch_size=self.batch_size,
-                                          num_workers=os.cpu_count(),
-                                          shuffle=False, persistent_workers=True)
+        return torch.utils.data.DataLoader(
+            self.dataset_val,
+            batch_size=self.batch_size,
+            num_workers=os.cpu_count(),
+            shuffle=False,
+            persistent_workers=True,
+        )
 
     def test_dataloader(self) -> DataLoader:
         """
@@ -211,10 +226,14 @@ class ImgDataModule(pl.LightningDataModule):
         """
 
         print(f"Length of the test dataset: {len(self.dataset_test)}")
-        return torch.utils.data.DataLoader(self.dataset_test,
-                                           batch_size=self.batch_size,
-                                          num_workers=os.cpu_count(),
-                                          shuffle=False,persistent_workers=True)
+        return torch.utils.data.DataLoader(
+            self.dataset_test,
+            batch_size=self.batch_size,
+            num_workers=os.cpu_count(),
+            shuffle=False,
+            persistent_workers=True,
+        )
+
     def predict_dataloader(self) -> DataLoader:
         """
         Define the test dataloader
@@ -223,33 +242,39 @@ class ImgDataModule(pl.LightningDataModule):
         """
 
         print(f"Length of the predict dataset: {len(self.dataset_predict)}")
-        return torch.utils.data.DataLoader(self.dataset_predict,
-                                           batch_size=self.batch_size,
-                                          num_workers=os.cpu_count(),
-                                          shuffle=False,persistent_workers=True)
+        return torch.utils.data.DataLoader(
+            self.dataset_predict,
+            batch_size=self.batch_size,
+            num_workers=os.cpu_count(),
+            shuffle=False,
+            persistent_workers=True,
+        )
+
 
 if __name__ == "__main__":
     data_dir = "experiments/dataset012"
     transform = transforms.Compose(
         [
             # torchvision.transforms.ToPILImage(),
-            transforms.Grayscale(num_output_channels=3),  # Convert 1 channel (BW) to 3 channels (RGB)
+            transforms.Grayscale(
+                num_output_channels=3
+            ),  # Convert 1 channel (BW) to 3 channels (RGB)
             transforms.Resize((224, 224)),
             transforms.ToTensor(),
         ]
     )
-    dataset_train = datasets.ImageFolder(root=data_dir+"/train", transform=transform)
-    dataset_test = datasets.ImageFolder(root=data_dir+"/test", transform=transform)
-    dataset_val = datasets.ImageFolder(root=data_dir+"/val", transform=transform)
+    dataset_train = datasets.ImageFolder(root=data_dir + "/train", transform=transform)
+    dataset_test = datasets.ImageFolder(root=data_dir + "/test", transform=transform)
+    dataset_val = datasets.ImageFolder(root=data_dir + "/val", transform=transform)
 
     print(dataset_train.classes)
     print(dataset_test)
     print(dataset_val)
     image_paths = [sample[0] for sample in dataset_train.samples]
     print(image_paths)
-    #zoo_train, zoo_val, zoo_test = random_split(dataset, [0.7, 0.15, 0.15])
-    #mean, std = calculate_mean_std(dataset_train)
+    # zoo_train, zoo_val, zoo_test = random_split(dataset, [0.7, 0.15, 0.15])
+    # mean, std = calculate_mean_std(dataset_train)
 
-    #print("#####" * 10)
-    #print(f"Mean: {mean}, Std: {std}")
-    #print("#####" * 10)
+    # print("#####" * 10)
+    # print(f"Mean: {mean}, Std: {std}")
+    # print("#####" * 10)

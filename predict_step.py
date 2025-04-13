@@ -4,11 +4,13 @@ from loop import LitModel
 import lightning as pl
 # Todo Atm the predict dataset has labels
 
+
 def load_model(checkpoint_path, device="mps"):
     model = LitModel.load_from_checkpoint(checkpoint_path)
     model.eval()
     model.to(device)
     return model, device
+
 
 if __name__ == "__main__":
     model_path = "wandb/run-20250326_162954-l87fmdvx/files/best.ckpt"

@@ -10,6 +10,7 @@ from lightning.pytorch.strategies import DDPStrategy
 from loop import LitModel
 from lightning.pytorch.loggers import WandbLogger
 import wandb
+
 wandb.login()
 logger = logging.getLogger(__name__)
 
@@ -37,8 +38,9 @@ def lightning_training(model_dir: str, hyperparameters: dict) -> object:
         hyperparameters=hyperparameters,
     )
 
-
-    wandb_logger = WandbLogger(log_model="all", project="DeepUVP_", entity="hhuml") # if not in hhuml obmit
+    wandb_logger = WandbLogger(
+        log_model="all", project="DeepUVP_", entity="hhuml"
+    )  # if not in hhuml obmit
 
     print(wandb_logger.experiment.name)
     print(wandb_logger.experiment.path)
@@ -51,17 +53,17 @@ def lightning_training(model_dir: str, hyperparameters: dict) -> object:
     hyperparameters.update({"model_dir": wandb_logger.experiment.dir})
 
     trainer = pl.Trainer(
-        logger = wandb_logger,
+        logger=wandb_logger,
         max_epochs=hyperparameters["max_epochs"],
         accelerator="gpu",
         devices=hyperparameters["devices"],
         default_root_dir=model_dir,
-        #strategy=DDPStrategy(find_unused_parameters=True) if torch.cuda.device_count() > 1 else "auto",
+        # strategy=DDPStrategy(find_unused_parameters=True) if torch.cuda.device_count() > 1 else "auto",
         precision=hyperparameters["precision"],
         limit_train_batches=hyperparameters["limit_batches"],
         limit_test_batches=hyperparameters["limit_batches"],
         limit_val_batches=hyperparameters["limit_batches"],
-        log_every_n_steps = 1,
+        log_every_n_steps=1,
         # fast_dev_run=True,
     )
     trainer.fit(model, data_module)
@@ -101,5 +103,6 @@ def lightning_training(model_dir: str, hyperparameters: dict) -> object:
 if __name__ == "__main__":
     logging.basicConfig(level="INFO")
     from config import HYPERPARAMETERS
+
     print(HYPERPARAMETERS)
     lightning_training(model_dir="logs", hyperparameters=HYPERPARAMETERS)

@@ -15,6 +15,8 @@ def sweep_iteration():
     config = wandb.config
     hyperparameters = HYPERPARAMETERS
     hyperparameters.update({"learning_rate": config.lr})
+    hyperparameters.update({"num_freeze_layers_resnet": config.num_freeze_layers_resnet})
+    #hyperparameters.update({"batch_size": config.batch_size})
 
     data_module = ImgDataModule(hyperparameters=hyperparameters)
     # setup model - note how we refer to sweep parameters with wandb.config
@@ -56,11 +58,15 @@ def sweep_iteration():
 
 
 sweep_config = {
-    "run_cap": 2,
-    "method": "random",  # Random search
+    "run_cap": 10,
+    "method": "bayes",  # Random search
     "metric": {  # We want to maximize val_acc
-        "name": "val_MulticlassAccuracy",
+        "name": "val_MulticlassF1Score",
         "goal": "maximize"
+    },
+    "early_terminate": {
+        "type": "hyperband",
+        "min_iter": 3
     },
     "parameters": {
         "lr": {
@@ -68,12 +74,14 @@ sweep_config = {
             "distribution": "log_uniform",
             "min": -9.21,  # exp(-9.21) = 1e-4
             "max": -4.61  # exp(-4.61) = 1e-2
-        }
+        },
+        "num_freeze_layers_resnet": {"values": [5, 7, 9]},
+        #"batch_size": {"values": [512, 1024]},
     }
 }
 
 if __name__ == "__main__":
     #wandb.login()
     sweep_id = wandb.sweep(sweep_config, project='DeepUVP_', entity="hhuml") # if not in hhuml obmit
-    wandb.agent(sweep_id, function=sweep_iteration, count=2)
+    wandb.agent(sweep_id, function=sweep_iteration, count=10)
     wandb.finish()

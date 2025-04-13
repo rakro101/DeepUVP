@@ -66,22 +66,33 @@ def lightning_training(model_dir: str, hyperparameters: dict) -> object:
     )
     trainer.fit(model, data_module)
     logger.debug("trainer model %s" % trainer.model)
-    #trainer.save_checkpoint("trained_model", weights_only=True)
+    try:
+        trainer.save_checkpoint("trained_model", weights_only=False)
+    except Exception as e:
+        logger.error(f"{e}")
 
     if hyperparameters["val_mode"] == "on":
         logger.info("Validate Model")
-        logger.debug("trainer_test model %s" % trainer.model)
-        trainer.validate(
-            model,
-            data_module,
-            ckpt_path="best",
-        )
+        logger.debug("trainer_val model %s" % trainer.model)
+        try:
+            trainer.validate(
+                model,
+                data_module,
+                ckpt_path="best",
+            )
+        except Exception as e:
+            logger.error(f"{e}")
     if hyperparameters["test_mode"] == "on":
         logger.info("Test Model")
-        trainer.test(
-            model,
-            data_module,
-        )
+        logger.debug("trainer_test model %s" % trainer.model)
+        try:
+            trainer.test(
+                model,
+                data_module,
+                ckpt_path="best",
+            )
+        except Exception as e:
+            logger.error(f"{e}")
 
     wandb.finish()
     return trainer

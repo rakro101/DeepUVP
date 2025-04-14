@@ -83,7 +83,7 @@ sweep_config = {
 if __name__ == "__main__":
     # wandb.login()
     sweep_id = wandb.sweep(
-        sweep_config, project="DeepUVP_", entity="hhuml"
+        sweep_config, project="DeepUVP", entity="hhu-marine"
     )  # if not in hhuml obmit
     wandb.agent(sweep_id, function=sweep_iteration, count=10)
     wandb.finish()

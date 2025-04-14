@@ -39,7 +39,7 @@ def lightning_training(model_dir: str, hyperparameters: dict) -> object:
     )
 
     wandb_logger = WandbLogger(
-        log_model="all", project="DeepUVP_", entity="hhuml"
+        log_model="all", project="DeepUVP", entity="hhu-marine"
     )  # if not in hhuml obmit
 
     print(wandb_logger.experiment.name)

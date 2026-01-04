@@ -3,6 +3,10 @@
 # DeepUVP
 # First run with ZooScann Images
 
+Repo moved to GitLab:  https://gitlab.com/qtb-hhu/marine/deepuvp
+
+
+
 # Installation Guide
 https://pytorch.org/get-started/locally/
 

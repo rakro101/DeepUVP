@@ -5,6 +5,8 @@
 
 Repo moved to GitLab:  https://gitlab.com/qtb-hhu/marine/deepuvp
 
+With changed / fixxed / improved Freeze Last N Layers.
+
 
 
 # Installation Guide
